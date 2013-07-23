@@ -7,7 +7,7 @@ require 'terminal-table'
 
 config = YAML.load(File.read("config.yml"))
 
-Net::SSH.start(config['host'], config['user'], config['password']) do |ssh|
+Net::SSH.start(config['host'], config['user'], :password => config['password']) do |ssh|
   puts ssh.exec! 'ls'
 end
 
