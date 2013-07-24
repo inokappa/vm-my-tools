@@ -8,11 +8,12 @@ require 'terminal-table'
 config = YAML.load(File.read("config.yml"))
 #
 rows = []
-Net::SSH.start(config['host'], config['user'], :password => config['password']) do |ssh|
+Net::SSH.start(config['host'], config['user'], :password => config['password'], :port => config['port']) do |ssh|
   vmuuids_raw = ssh.exec! "xe vm-list power-state=running is-control-domain=false params=uuid | awk -F\": \" '{print $2}'"
-  vmuuids = [vmuuids_raw.sub(/[\r\n]*\z/, %())]
+  vmuuids = vmuuids_raw.split("\n\n\n")
   vmuuids.each do |vmuuid|
-    vm_name = ssh.exec! "xe vm-list uuid=#{vmuuid} params=name-label | awk -F\": \" '{print $2}'"
+    puts vmuuid
+    vm_name = ssh.exec! "xe vm-param-get uuid=#{vmuuid} param-name=name-label"
     cpu = ssh.exec! "xe vm-param-get uuid=#{vmuuid} param-name=VCPUs-utilisation"
     mem = ssh.exec! "xe vm-data-source-query data-source=memory uuid=#{vmuuid}"
     mem_free = ssh.exec! "xe vm-data-source-query data-source=memory_internal_free uuid=#{vmuuid}"
@@ -20,6 +21,6 @@ Net::SSH.start(config['host'], config['user'], :password => config['password']) 
   end
 end
 #
-table = Terminal::Table.new :headings => ['vm_name','cpu','mem','mem_free'], :rows => rows
+table = Terminal::Table.new :headings => ['vm_name','cpu','mem(byte)','mem_free(KB)'], :rows => rows
 #
 puts table
