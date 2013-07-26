@@ -6,54 +6,48 @@ require 'yaml'
 require 'terminal-table'
 
 config = YAML.load(File.read("config.yml"))
-#
+
+# connect to xenserver
 class Con
-  def initialize(options)
-    @options = optsions
+  def initialize(host,user,password)
+    @host = host
+    @user = user
+    @password = password
   end
-  def connect
-    @ssh = Net::SSH.start(@options) 
-  end
-  def connection
-    @ssh if @ssh
-  end
-  def get_uuid
-    vmuuids_raw = connection.exec! "xe vm-list power-state=running is-control-domain=false params=uuid | awk -F\": \" '{print $2}'"
-    vmuuids = vmuuids_raw.split("\n\n\n")
+  def ssh_exec(command)
+    ssh = Net::SSH.start(@host, @user, @password) 
+    ssh.exec! command
   end
 end
 
-class Com < Con
-  def initialize(vmuuid)
-    @vmuuid = "#{vmuuid}"
+# commands
+class Commands < Con
+  def get_vm_uuid
+    vm_uuid_raw = ssh_exec("xe vm-list power-state=running is-control-domain=false params=uuid | awk -F\": \" '{print $2}'")
+    vm_uuid = vm_uuid_raw.split("\n\n\n")
   end
-  def vm_name_cmd
-    cmd("xe vm-param-get uuid=", @vmuuid ," param-name=name-label")
+  def get_vm_name(vmuuid)
+    ssh_exec("xe vm-param-get uuid=#{vmuuid} param-name=name-label")
   end
-  def cpu_cmd
-    cmd("xe vm-param-get uuid=", @vmuuid ," param-name=name-label")
+  def get_vm_cpu(vmuuid)
+    ssh_exec("xe vm-param-get uuid=#{vmuuid} param-name=VCPUs-utilisation")
   end
-  def mem_cmd
-    cmd("xe vm-data-source-query data-source=memory uuid=", @vmuuid)
+  def get_vm_mem(vmuuid)
+    ssh_exec("xe vm-data-source-query data-source=memory uuid=#{vmuuid}")
   end
-  def mem_free_cmd
-    cmd("xe vm-data-source-query data-source=memory_internal_free uuid=", @vmuuid)
+  def get_vm_mem_free(vmuuid)
+    ssh_exec("xe vm-data-source-query data-source=memory_internal_free uuid=#{vmuuid}")
   end
 end
-#
-print "connecting to server...#{ARGV[0]}...\n"
+
+# get params
 rows = []
-Net::SSH.start(ARGV[0], config['user'], :password => config['password'], :port => config['port']) do |ssh|
-  vmuuids_raw = ssh.exec! "xe vm-list power-state=running is-control-domain=false params=uuid | awk -F\": \" '{print $2}'"
-  vmuuids = vmuuids_raw.split("\n\n\n")
-  vmuuids.each do |vmuuid|
-    puts "#{vmuuid}"
-    chk = Com.new("#{vmuuid}")
-    rows << ["#{vm_name}","#{cpu}","#{mem}","#{mem_free}"] 
-  end
+puts "Connect to XenServer #{config['host']}..."
+chk = Commands.new(config['host'], config['user'], :password => config['password'])
+chk.get_vm_uuid.each do |vmuuid|
+  rows << ["#{chk.get_vm_name(vmuuid)}","#{chk.get_vm_cpu(vmuuid)}","#{chk.get_vm_mem(vmuuid)}","#{chk.get_vm_mem_free(vmuuid)}"]
 end
-#
-table = Terminal::Table.new :headings => ['vm_name','cpu','mem(byte)','mem_free(KB)'], :rows => rows
-#
-puts table
 
+# genarate table
+table = Terminal::Table.new :headings => ['vm_name','cpu','mem(byte)','mem_free(KB)'], :rows => rows
+puts table
