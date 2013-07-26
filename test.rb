@@ -8,47 +8,38 @@ require 'terminal-table'
 config = YAML.load(File.read("config.yml"))
 #
 class Con
-  def initialize(options)
-    @options = options
+  def initialize(host,user,password)
+    @host = host
+    @user = user
+    @password = password
   end
   def connect
-    @ssh = Net::SSH.start(@options) 
-  end
-  def connection
-    @ssh if @ssh
+    @ssh = Net::SSH.start(@host, @user, @password) 
   end
   def cmd(command)
-    connection.exec!
+    @ssh.exec! @command
   end
 end
 
-class Uuid < Con
-  def get_uuid
-    vmuuids_raw = cmd("xe vm-list power-state=running is-control-domain=false params=uuid | awk -F\": \" '{print $2}'")
-    vmuuids = vmuuids_raw.split("\n\n\n")
-  end
-end
+#class Uuid < Con
+#  def get_uuid
+#    vmuuids_raw = cmd("xe vm-list power-state=running is-control-domain=false params=uuid | awk -F\": \" '{print $2}'")
+#    vmuuids = vmuuids_raw.split("\n\n\n")
+#  end
+#end
 
 class Command < Con
-  def initialize(vmuuid)
-    @vmuuid = "#{vmuuid}"
-  end
-  def vm_name_cmd
-    cmd("xe vm-param-get uuid=", @vmuuid ," param-name=name-label")
-  end
-  def cpu_cmd
-    cmd("xe vm-param-get uuid=", @vmuuid ," param-name=name-label")
-  end
-  def mem_cmd
-    cmd("xe vm-data-source-query data-source=memory uuid=", @vmuuid)
-  end
-  def mem_free_cmd
-    cmd("xe vm-data-source-query data-source=memory_internal_free uuid=", @vmuuid)
+#  def initialize(vmuuid)
+#    @vmuuid = "#{vmuuid}"
+#  end
+  def pwd_cmd
+    cmd("pwd")
   end
 end
 #
-print "connecting to server...#{ARGV[0]}...\n"
+print "connecting to server...#{config['host']}...\n"
 print "connecting to server...#{config['user']}...\n"
+print "connecting to server...#{config['port']}...\n"
 #rows = []
 #Net::SSH.start(ARGV[0], config['user'], :password => config['password'], :port => config['port']) do |ssh|
 #  vmuuids_raw = ssh.exec! "xe vm-list power-state=running is-control-domain=false params=uuid | awk -F\": \" '{print $2}'"
@@ -60,9 +51,10 @@ print "connecting to server...#{config['user']}...\n"
 #  end
 #end
 #
-#chk = Con.new (ARGV[0], config['user'], :password => config['password'], :port => config['port'])
+#chk = Command.new(config['host'], config['user'], :password => config['password'], :port => config['port'])
+chk = Command.new(config['host'], config['user'], :password => config['password'])
 p chk
-p chk::Command
+p chk.pwd_cmd
 #table = Terminal::Table.new :headings => ['vm_name','cpu','mem(byte)','mem_free(KB)'], :rows => rows
 #
 #puts table
